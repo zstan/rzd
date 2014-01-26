@@ -95,7 +95,7 @@ st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date+'&ri
     l_trains = r['tp'][0]['list']
     #print l_trains
     for train in l_trains:
-      out += '*************************************************<br>'
+      out += '**************************************************<br>'
       out += u'станция отправления: ' + train['station0'] + '<br>'
       out += u'станция прибытия: ' + train['station1'] + '<br>'
       out += u'время в пути: ' + train['timeInWay'] + '<br>'
@@ -199,6 +199,7 @@ class ThemesPage(webapp2.RequestHandler):
         except (TypeError, ValueError):
             self.response.out.write("<html><body><p>Invalid inputs</p></body></html>")
 
+"""
 class FavPage(webapp2.RequestHandler):
 
     def get(self):
@@ -206,6 +207,7 @@ class FavPage(webapp2.RequestHandler):
             self.response.out.write(open(os.getcwd()+'/favicon.ico', 'rb').read())
         except (TypeError, ValueError):
             self.response.out.write("<html><body><p>Invalid inputs</p></body></html>")
+"""
 
 class TestPage(webapp2.RequestHandler):
 
@@ -218,7 +220,6 @@ application = webapp2.WSGIApplication([
     ('/trains', TrainListPage),
     ('/suggester', SuggesterPage),
     ('/themes/(.*)', ThemesPage),
-    ('/favicon.ico', FavPage),
     ('/test', TestPage)
 ], debug=True)
 

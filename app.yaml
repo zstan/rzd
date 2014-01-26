@@ -1,10 +1,15 @@
-application: rzdzstan1
+application: rzdzstan0
 version: 1
 runtime: python27
 threadsafe: false
 api_version: 1
 
 handlers:
+
+- url: /favicon.ico
+  static_files: favicon.ico
+  upload: favicon.ico
+
 - url: /.*
   script: web.py
 

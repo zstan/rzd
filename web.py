@@ -124,14 +124,14 @@ class MainPage(webapp2.RequestHandler):
              <form action="/trains" method="post">
                <H2>Поиск билетов на РЖД</H2>
                <div class="ui-widget">
-                 <input class="suggest" id="from" type="search" name="from" size="30" placeholder="откуда" tabindex="0">
+                 <input class="suggest" id="from" type="search" name="from" size="30" placeholder="откуда" tabindex="0" required="true">
                </div>
                <br>
                <div class="ui-widget">
-                 <input class="suggest" id="to" type="search" name="to" size="30" placeholder="куда" tabindex="1">
+                 <input class="suggest" id="to" type="search" name="to" size="30" placeholder="куда" tabindex="1" required="true">
                </div>
                <br>
-               <div><input type="text" id="datepicker" name="date" tabindex="2" placeholder="дата"></div>
+               <div><input type="text" id="datepicker" name="date" tabindex="2" placeholder="дата" required="true"></div>
                <br>
                <div><input type="submit" value="мне повезет" tabindex="3"></div>
              </form>

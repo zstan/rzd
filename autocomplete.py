@@ -1,8 +1,8 @@
 ﻿
 
-def getMainPage(s):
-  s.response.out.write("<html><head>" +
-  getAutocomplete() +
+def getMainPage():
+  return "<html><head>" +\
+  getAutocomplete() +\
   """
    </head>
       <body>
@@ -22,7 +22,7 @@ def getMainPage(s):
        </form>
      </body>
    </html>
-    """)
+   """
 
 def getAutocomplete():
   return """

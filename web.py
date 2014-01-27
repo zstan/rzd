@@ -116,8 +116,13 @@ st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date+'&ri
 
 
 class MainPage(webapp2.RequestHandler):
+  mainPage = None
+
   def get(self):
-    getMainPage(self)
+    if not self.mainPage:
+      self.mainPage = getMainPage()
+
+    self.response.out.write(self.mainPage)
 
 def getProperDate(date):
   items = date.split('/')

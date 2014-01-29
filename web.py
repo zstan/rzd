@@ -213,22 +213,11 @@ class ThemesPage(webapp2.RequestHandler):
         except (TypeError, ValueError):
             self.response.out.write("<html><body><p>Invalid inputs</p></body></html>")
 
-class TestPage(webapp2.RequestHandler):
-
-    def get(self):
-        #resp = opener.open('http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%D0%B9%D0%B9%D0%B9')
-        #sendMail()
-        #self.response.out.write(resp.read())
-        global suggestDict
-        for k in suggestDict.keys():
-          self.response.out.write(k+'<br>')
-
 application = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/trains', TrainListPage),
     ('/suggester', SuggesterPage),
     ('/themes/(.*)', ThemesPage),
-    ('/test', TestPage)
 ], debug=True)
 
 def main():

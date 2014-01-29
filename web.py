@@ -9,9 +9,18 @@ from httplib import HTTPException, HTTPConnection
 import webapp2, httplib
 import urllib, urllib2, cookielib, json
 from autocomplete import getMainPage
+from mail import sendMail
+from google.appengine.runtime import DeadlineExceededError
+
+mainPage = None # temporary stub !!!
+suggestDict = {}
+suggestDictSize = 5000
 
 cj = cookielib.CookieJar()
 opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+
+redFont0 = '<font size=\"2\" color=\"red\">'
+redFont1 = '</font>'
 
 def getResponse(url):
   good = False
@@ -76,7 +85,7 @@ def getRidSid(st0, st1, date, s):
 st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date
 
   r = json.loads(getResponse(req1))
-  if (r['result']=='OK'):
+  if (r['result'].lower()=='ok'):
     s.response.out.write(r['tp'][0]['msgList'][0]['message']) #errType
     s.response.out.write('<br>')
     #s.response.out.write(r)
@@ -90,19 +99,22 @@ st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date+'&ri
   
   out = '<html><body><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
   if ('tp' in r):
-    out += r['tp'][0]['from'] + '<br>'
-    out += r['tp'][0]['where'] + '<br>'
+    out += '<br>' + redFont0 + r['tp'][0]['from'] + ' -> '
+    out += r['tp'][0]['where'] + redFont1 + '<br>'
     out += r['tp'][0]['date'] + '<br>'
     l_trains = r['tp'][0]['list']
     #print l_trains
     for train in l_trains:
-      out += '**************************************************<br>'
-      out += u'станция отправления: ' + train['station0'] + '<br>'
+      out += '<hr color="red" size="3" width="50%" align="left"/><br>'
+      out += u'станция отправления: %s <br>' % train['station0']
       out += u'станция прибытия: ' + train['station1'] + '<br>'
       out += u'время в пути: ' + train['timeInWay'] + '<br>'
       out += u'время отправления: ' + train['time0'] + '<br>'
       out += u'время прибытия: ' + train['time1'] + '<br>'
-      out += u'номер поезда: ' + train['number'] + '<br>'
+      bFirm = ''
+      if 'bFirm' in train:
+        bFirm = redFont0 + u' (фирменный)' + redFont1
+      out += u'номер поезда: ' + train['number'] + bFirm + '<br>'
       for car in train['cars']:
         out += '---------------------<br>'
         out += u'тип: ' + car['typeLoc'] + '<br>'
@@ -110,60 +122,78 @@ st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date+'&ri
         out += u'цена: ' + str(car['tariff']) + '<br>'
         out += '---------------------<br>'
   else:
-    out += "Some error occured: " + s.response.out.write(r)
+    out += "Some error occured: " + str(r)
 
   s.response.out.write(out)
 
-
 class MainPage(webapp2.RequestHandler):
-  mainPage = None
-
+  
   def get(self):
-    if not self.mainPage:
-      self.mainPage = getMainPage()
-
-    self.response.out.write(self.mainPage)
+    global mainPage
+    if not mainPage:
+      mainPage = getMainPage()
+    self.response.out.write(mainPage)
 
 def getProperDate(date):
   items = date.split('/')
-  return ('%s.%s.%s' % (items[1], items[0], items[2]))
+  sOut = ''
+  try:
+    sOut = ('%s.%s.%s' % (items[1], items[0], items[2]))
+  except (IndexError):
+    print 'IndexError: ' + date
+  return sOut
 
 class TrainListPage(webapp2.RequestHandler):
     def post(self):
-        self.response.out.write('<html><body>Нашли:<pre>')
+        self.response.out.write('<html><body>Результаты поиска:<pre>')
         st0  = cgi.escape(self.request.get('from'))
         st1  = cgi.escape(self.request.get('to'))
         date = getProperDate(cgi.escape(self.request.get('date')))
         
-        getRidSid(st0, st1, date, self)
+        try:
+          getRidSid(st0, st1, date, self)
+        except DeadlineExceededError:
+            self.response.clear()
+            self.response.set_status(500)
+            self.response.out.write("This operation could not be completed in time... st0 %s st1 %s date %s" % (st0, st1, date))
         self.response.out.write('</pre></body></html>')
 
 class SuggesterPage(webapp2.RequestHandler):
 
     def get(self):
+        global suggestDict
+
         try:
-            first = self.request.get('lang')
             station = self.request.get('stationNamePart')
+
+            if station in suggestDict:
+              self.response.out.write(suggestDict[station])
+              return
 
             req='http://pass.rzd.ru/suggester?lang=ru&stationNamePart='+urllib.quote(station.encode('utf-8'))
             respData = getResponse(req)
-            rJson = json.loads(respData)
-            sOut = '['
-            cnt = 1
-            sStations = set()
-            for item in rJson:
-              if item['name'] not in sStations:
-                sStations.add(item['name'])
-            lStations = self.sort4Find(sStations, station.lower())
-            for item in lStations:
-                sOut += '{\"id\":\"'+str(cnt)+'\",\"label\":\"'+item+'\",\"value\":\"'+item+'\"},'
-                cnt += 1
-            sOut = sOut[:-1]
-            sOut += ']'
-            self.response.out.write(sOut)
+            suggOut = '[]'
+
+            if len(respData) > 0:
+              rJson = json.loads(respData)
+              suggOut = '['
+              cnt = 1
+              sStations = set()
+              for item in rJson:
+                if item['name'] not in sStations:
+                  sStations.add(item['name'])
+              lStations = self.sort4Find(sStations, station.lower())
+              for item in lStations:
+                  suggOut += '{\"id\":\"'+str(cnt)+'\",\"label\":\"'+item+'\",\"value\":\"'+item+'\"},'
+                  cnt += 1
+              suggOut = suggOut[:-1]
+              suggOut += ']'
+            if len(suggestDict) < suggestDictSize: #one more stub !!!
+              suggestDict[station] = suggOut
+            self.response.out.write(suggOut)
 
         except (TypeError, ValueError):
-            self.response.out.write("<html><body><p>Invalid inputs</p></body></html>")
+            self.response.out.write("[]")
 
     def sort4Find(self, sStations, suggest):
       l0 = []
@@ -174,7 +204,6 @@ class SuggesterPage(webapp2.RequestHandler):
         else:
           l1.append(station)
       return l0 + l1
-
 
 class ThemesPage(webapp2.RequestHandler):
 
@@ -187,8 +216,12 @@ class ThemesPage(webapp2.RequestHandler):
 class TestPage(webapp2.RequestHandler):
 
     def get(self):
-        resp = opener.open('http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%D0%BC%D0%BE%D1%81')
-        self.response.out.write(resp.read())
+        #resp = opener.open('http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%D0%B9%D0%B9%D0%B9')
+        #sendMail()
+        #self.response.out.write(resp.read())
+        global suggestDict
+        for k in suggestDict.keys():
+          self.response.out.write(k+'<br>')
 
 application = webapp2.WSGIApplication([
     ('/', MainPage),

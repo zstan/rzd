@@ -16,7 +16,7 @@ def getMainPage():
            <input class="suggest" id="to" type="search" name="to" size="30" placeholder="куда" tabindex="1" required="true">
          </div>
          <br>
-         <div><input type="text" id="datepicker" name="date" tabindex="2" placeholder="дата" required="true"></div>
+         <div><input type="text" id="datepicker" name="date" tabindex="2" placeholder="дата" required="true" readonly></div>
          <br>
          <div><input type="submit" value="мне повезет" tabindex="3"></div>
        </form>
@@ -47,11 +47,6 @@ def getAutocomplete():
                 params = params || {};
                 var $elem = this, // сам элемент
                         options = { // параметры по умолчанию
-                            source: function (request, response) {
-                                $.getJSON("suggester?lang=ru", {
-                                    stationNamePart: extractLast(request.term)
-                                }, response);
-                            },
                             search: function () {
                                 // custom minLength
                                 var term = extractLast(this.value);
@@ -101,7 +96,6 @@ def getAutocomplete():
             // если хотим переопределить стандартные параметры, то можно их передать в вызов нашего плагина
             var params = {
                 source: function (request, response) {
-                    console.log("hello world");
                     $.getJSON("suggester?lang=ru", {
                         stationNamePart: request.term.split(/,\s*/).pop()
                     }, response);

@@ -16,30 +16,31 @@ mainPage = None # temporary stub !!!
 suggestDict = {}
 suggestDictSize = 5000
 
-cj = cookielib.CookieJar()
-opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-
 redFont0 = '<font size=\"2\" color=\"red\">'
 redFont1 = '</font>'
 
-def getResponse(url):
+def getResponse(url, opener = None):
   good = False
   while not good:
     try:
-      resp = opener.open(url, timeout=5)
+      resp = None
+      if not opener:
+        resp = urllib2.urlopen(url, timeout=5)
+      else:
+        resp = opener.open(url, timeout=5)
       if resp.getcode() in [httplib.OK, httplib.CREATED, httplib.ACCEPTED]:
         good = True
     except (urllib2.HTTPError, HTTPException):
       pass
   return resp.read()
 
-def getResponseStub(url):
-  r = json.loads(getResponse(url))
+def getResponseStub(url, opener):
+  r = json.loads(getResponse(url, opener))
   cnt = 0
   while (r['result']!='OK' and cnt < 5):
     sleep(1)
     cnt+=1
-    r = json.loads(getResponse(url))
+    r = json.loads(getResponse(url, opener))
   return r
 
 def getCityId(city, s):
@@ -57,11 +58,11 @@ def getCityId(city, s):
   return None
 
 def getRidSid(st0, st1, date, s):
+  """
   username = 'user'
   password = 'pass'
   login_data = urllib.urlencode({'j_username' : username, 'j_password' : password, 'action' : 'Вход'})
 
-  """
   good = False
   while not good:
     try:
@@ -84,7 +85,7 @@ def getRidSid(st0, st1, date, s):
   req1 = 'http://pass.rzd.ru/timetable/public/ru?STRUCTURE_ID=735&layer_id=5371&dir=0&tfl=3&checkSeats=1&\
 st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date
 
-  r = json.loads(getResponse(req1))
+  r = json.loads(getResponse(req1, s.opener))
   if (r['result'].lower()=='ok'):
     s.response.out.write(r['tp'][0]['msgList'][0]['message']) #errType
     s.response.out.write('<br>')
@@ -95,7 +96,7 @@ st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date
   req2 = 'http://pass.rzd.ru/timetable/public/ru?STRUCTURE_ID=735&layer_id=5371&dir=0&tfl=3&checkSeats=1&\
 st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date+'&rid='+rid+'&SESSION_ID='+sid
 
-  r = getResponseStub(req2)
+  r = getResponseStub(req2, s.opener)
   
   out = '<html><body><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
   if ('tp' in r):
@@ -144,19 +145,22 @@ def getProperDate(date):
   return sOut
 
 class TrainListPage(webapp2.RequestHandler):
-    def post(self):
-        self.response.out.write('<html><body>Результаты поиска:<pre>')
-        st0  = cgi.escape(self.request.get('from'))
-        st1  = cgi.escape(self.request.get('to'))
-        date = getProperDate(cgi.escape(self.request.get('date')))
-        
-        try:
-          getRidSid(st0, st1, date, self)
-        except DeadlineExceededError:
-            self.response.clear()
-            self.response.set_status(500)
-            self.response.out.write("This operation could not be completed in time... st0 %s st1 %s date %s" % (st0, st1, date))
-        self.response.out.write('</pre></body></html>')
+  cj = cookielib.CookieJar()
+  opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+
+  def post(self):
+      self.response.out.write('<html><body>Результаты поиска:<pre>')
+      st0  = cgi.escape(self.request.get('from'))
+      st1  = cgi.escape(self.request.get('to'))
+      date = getProperDate(cgi.escape(self.request.get('date')))
+      
+      try:
+        getRidSid(st0, st1, date, self)
+      except DeadlineExceededError:
+        self.response.clear()
+        self.response.set_status(500)
+        self.response.out.write("This operation could not be completed in time... st0 %s st1 %s date %s" % (st0, st1, date))
+      self.response.out.write('</pre></body></html>')
 
 class SuggesterPage(webapp2.RequestHandler):
 
@@ -213,15 +217,15 @@ class ThemesPage(webapp2.RequestHandler):
         except (TypeError, ValueError):
             self.response.out.write("<html><body><p>Invalid inputs</p></body></html>")
 
-application = webapp2.WSGIApplication([
+app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/trains', TrainListPage),
     ('/suggester', SuggesterPage),
     ('/themes/(.*)', ThemesPage),
 ], debug=True)
 
-def main():
-    application.run()
+#def main():
+#    application.run()
 
-if __name__ == "__main__":
-    main()
+#if __name__ == "__main__":
+#    main()

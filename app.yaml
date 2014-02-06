@@ -4,6 +4,14 @@ runtime: python27
 threadsafe: true
 api_version: 1
 
+default_expiration: "5d"
+
+builtins:
+- appstats: on
+
+skip_files:
+- ^(.*/)?.*\.py[co]
+
 handlers:
 
 - url: /favicon.ico
@@ -14,9 +22,18 @@ handlers:
   static_files: robots.txt
   upload: robots.txt
 
+- url: /themes
+  static_dir: themes
+
 - url: /.*
   script: web.app
 
 libraries:
 - name: webapp2
   version: "latest"
+
+error_handlers:
+  - file: default_error.html
+
+  - error_code: over_quota
+    file: over_quota.html

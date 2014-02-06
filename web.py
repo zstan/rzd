@@ -11,6 +11,7 @@ import urllib, urllib2, cookielib, json
 from autocomplete import getMainPage
 from mail import sendMail
 from google.appengine.runtime import DeadlineExceededError
+import logging, storage
 
 mainPage = None # temporary stub !!!
 suggestDict = {}
@@ -141,7 +142,7 @@ def getProperDate(date):
   try:
     sOut = ('%s.%s.%s' % (items[1], items[0], items[2]))
   except (IndexError):
-    print 'IndexError: ' + date
+    logging.error('IndexError: ' + date)
   return sOut
 
 class TrainListPage(webapp2.RequestHandler):
@@ -151,6 +152,7 @@ class TrainListPage(webapp2.RequestHandler):
   def post(self):
       self.response.out.write('<html><body>Результаты поиска:<pre>')
       st0  = cgi.escape(self.request.get('from'))
+      storage.addReq(st0)
       st1  = cgi.escape(self.request.get('to'))
       date = getProperDate(cgi.escape(self.request.get('date')))
       
@@ -166,6 +168,7 @@ class SuggesterPage(webapp2.RequestHandler):
 
     def get(self):
         global suggestDict
+        suggOut = '[]'
 
         try:
             station = self.request.get('stationNamePart')
@@ -176,7 +179,6 @@ class SuggesterPage(webapp2.RequestHandler):
 
             req='http://pass.rzd.ru/suggester?lang=ru&stationNamePart='+urllib.quote(station.encode('utf-8'))
             respData = getResponse(req)
-            suggOut = '[]'
 
             if len(respData) > 0:
               rJson = json.loads(respData)
@@ -186,18 +188,20 @@ class SuggesterPage(webapp2.RequestHandler):
               for item in rJson:
                 if item['name'] not in sStations:
                   sStations.add(item['name'])
-              lStations = self.sort4Find(sStations, station.lower())
+              lStations = self.sort4Find(sStations, station.lower())[:15]
               for item in lStations:
                   suggOut += '{\"id\":\"'+str(cnt)+'\",\"label\":\"'+item+'\",\"value\":\"'+item+'\"},'
                   cnt += 1
               suggOut = suggOut[:-1]
               suggOut += ']'
+
             if len(suggestDict) < suggestDictSize: #one more stub !!!
               suggestDict[station] = suggOut
+
             self.response.out.write(suggOut)
 
         except (TypeError, ValueError):
-            self.response.out.write("[]")
+            self.response.out.write(suggOut)
 
     def sort4Find(self, sStations, suggest):
       l0 = []
@@ -209,19 +213,10 @@ class SuggesterPage(webapp2.RequestHandler):
           l1.append(station)
       return l0 + l1
 
-class ThemesPage(webapp2.RequestHandler):
-
-    def get(self, name):
-        try:
-            self.response.out.write(open(os.getcwd()+'/themes/'+name, 'rb').read())
-        except (TypeError, ValueError):
-            self.response.out.write("<html><body><p>Invalid inputs</p></body></html>")
-
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/trains', TrainListPage),
     ('/suggester', SuggesterPage),
-    ('/themes/(.*)', ThemesPage),
 ], debug=True)
 
 #def main():

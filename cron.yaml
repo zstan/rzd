@@ -1,0 +1,4 @@
+cron:
+- description: mail summary job
+  url: /summary_mail
+  schedule: every 1 hour

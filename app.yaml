@@ -1,13 +1,10 @@
-application: rzdzstan1
+application: rzdzstan0
 version: 1
 runtime: python27
 threadsafe: true
 api_version: 1
 
 default_expiration: "5d"
-
-builtins:
-- appstats: on
 
 skip_files:
 - ^(.*/)?.*\.py[co]
@@ -25,6 +22,10 @@ handlers:
 - url: /themes
   static_dir: themes
 
+- url: /summary_mail
+  script: web.app
+  login: admin
+
 - url: /.*
   script: web.app
 
@@ -33,7 +34,7 @@ libraries:
   version: "latest"
 
 error_handlers:
-  - file: default_error.html
+  - file: /themes/default_error.html
 
   - error_code: over_quota
-    file: over_quota.html
+    file: /themesover_quota.html

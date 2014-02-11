@@ -1,4 +1,7 @@
-﻿
+﻿#!/usr/local/bin/python3
+# -*- coding: utf-8 -*-
+
+from google.appengine.api import users
 
 def getMainPage():
   return "<html><head>" +\
@@ -20,9 +23,18 @@ def getMainPage():
          <br>
          <div><input type="submit" value="мне повезет" tabindex="3"></div>
        </form>
+  """ + getCurrentGoogleUser()+\
+  """
      </body>
    </html>
-   """
+  """
+
+def getCurrentGoogleUser():
+  user = users.get_current_user()
+  if not user:      
+      return "<br><br>You are not looged in google or haven`t accout"
+  else:
+      return "<br><br>Hello, %s, %s! " % (user.nickname(), user.email())
 
 def getAutocomplete():
   return """
@@ -36,6 +48,18 @@ def getAutocomplete():
   .ui-autocomplete-loading {
     background: white url('http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.1/themes/base/images/ui-anim_basic_16x16.gif') right center no-repeat;
   }
+
+
+{ margin: 0; padding: 0; }
+
+html { 
+        background: url('themes/images/bg.jpg') no-repeat center center fixed; 
+        -webkit-background-size: cover;
+        -moz-background-size: cover;
+        -o-background-size: cover;
+        background-size: cover;
+}
+
   </style>
   <script>
         $(function() {

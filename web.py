@@ -83,8 +83,7 @@ def getRidSid(st0, st1, date, s):
   if (not id0 or not id1):
     return
   
-  req1 = 'http://pass.rzd.ru/timetable/public/ru?STRUCTURE_ID=735&layer_id=5371&dir=0&tfl=3&checkSeats=1&\
-st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date
+  req1 = 'http://pass.rzd.ru/timetable/public/ru?STRUCTURE_ID=735&layer_id=5371&dir=0&tfl=3&checkSeats=1&st0=%s&code0=%s&dt0=%s&st1=%s&code1=%s&dt1=%s' % (st0, id0, date, st1, id1, date)
 
   r = json.loads(getResponse(req1, s.opener))
   if (r['result'].lower()=='ok'):
@@ -94,8 +93,8 @@ st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date
     return
   sid = str(r['SESSION_ID'])
   rid = str(r['rid'])
-  req2 = 'http://pass.rzd.ru/timetable/public/ru?STRUCTURE_ID=735&layer_id=5371&dir=0&tfl=3&checkSeats=1&\
-st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date+'&rid='+rid+'&SESSION_ID='+sid
+
+  req2 = req1+'&rid='+rid+'&SESSION_ID='+sid
 
   r = getResponseStub(req2, s.opener)
   
@@ -108,6 +107,7 @@ st0='+st0+'&code0='+id0+'&dt0='+date+'&st1='+st1+'&code1='+id1+'&dt1='+date+'&ri
     #print l_trains
     for train in l_trains:
       out += '<hr color="red" size="3" width="50%" align="left"/><br>'
+      out += u'<input type="radio" name="radAnswer" id=%s/ disabled="true">заказать отчет на почту<br>' % req1
       out += u'станция отправления: %s <br>' % train['station0']
       out += u'станция прибытия: ' + train['station1'] + '<br>'
       out += u'время в пути: ' + train['timeInWay'] + '<br>'
@@ -213,10 +213,30 @@ class SuggesterPage(webapp2.RequestHandler):
           l1.append(station)
       return l0 + l1
 
+class SummaryMailPage(webapp2.RequestHandler):
+
+  def get(self):
+    #sendMail(storage.getReq())
+    pass
+
+class TestPage(webapp2.RequestHandler):
+
+  def get(self):
+      #resp = opener.open('http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%D0%B9%D0%B9%D0%B9')
+      #sendMail()
+      #self.response.out.write(resp.read())
+      #global suggestDict
+      #for k in suggestDict.keys():
+      #  self.response.out.write(k+'<br>')
+      #storage.addUser('test@email.me')
+      self.response.out.write(storage.getReq())
+
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/trains', TrainListPage),
     ('/suggester', SuggesterPage),
+    ('/summary_mail', SummaryMailPage),
+    ('/test', TestPage)
 ], debug=True)
 
 #def main():

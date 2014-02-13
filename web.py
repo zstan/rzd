@@ -12,6 +12,7 @@ from autocomplete import getMainPage
 from mail import sendMail
 from google.appengine.runtime import DeadlineExceededError
 import logging, storage
+from datetime import datetime
 
 mainPage = None # temporary stub !!!
 suggestDict = {}
@@ -53,9 +54,9 @@ def getCityId(city, s):
       s.response.out.write(u'Найден: '+item['name']+' -> '+str(item['id'])+'<br>')
       return str(item['id'])
   s.response.out.write(u'Не найден: '+city+'<br>')
-  s.response.out.write(u'Выбранный вами город не найден, попробуйте найти в списке и ввести еще раз:<a href="../">Вернуться</a><br>')
-  for item in rJson:
-    s.response.out.write(item['name']+'<br>')
+  s.response.out.write(u'Выбранный вами город не найден, попробуйте еще раз:&nbsp;&nbsp;<a href="../">Вернуться</a><br>')
+  #for item in rJson:
+  #  s.response.out.write(item['name']+'<br>')
   return None
 
 def getRidSid(st0, st1, date, s):
@@ -91,10 +92,13 @@ def getRidSid(st0, st1, date, s):
     s.response.out.write('<br>')
     #s.response.out.write(r)
     return
-  sid = str(r['SESSION_ID'])
-  rid = str(r['rid'])
+  try:
+    sid = str(r['SESSION_ID'])
+    rid = str(r['rid'])
+  except Exception, e:
+    logging.error('Error: ' + str(r))
 
-  req2 = req1+'&rid='+rid+'&SESSION_ID='+sid
+  req2 = req1+'&rid=%s&SESSION_ID=%s' % (rid, sid)
 
   r = getResponseStub(req2, s.opener)
   
@@ -107,22 +111,25 @@ def getRidSid(st0, st1, date, s):
     #print l_trains
     for train in l_trains:
       out += '<hr color="red" size="3" width="50%" align="left"/><br>'
-      out += u'<input type="radio" name="radAnswer" id=%s/ disabled="true">заказать отчет на почту<br>' % req1
-      out += u'станция отправления: %s <br>' % train['station0']
-      out += u'станция прибытия: ' + train['station1'] + '<br>'
-      out += u'время в пути: ' + train['timeInWay'] + '<br>'
-      out += u'время отправления: ' + train['time0'] + '<br>'
-      out += u'время прибытия: ' + train['time1'] + '<br>'
+      out += u'<input type="radio" name="radAnswer" id=%s/ disabled="true">заказать отчет на почту<br><br>' % req1
+      out += u'&nbsp;станция отправления: %s <br>' % train['station0']
+      out += u'&nbsp;станция прибытия: ' + train['station1'] + '<br>'
+      out += u'&nbsp;время в пути: ' + train['timeInWay'] + '<br>'
+      out += u'&nbsp;время отправления: ' + train['time0'] + '<br>'
+      out += u'&nbsp;время прибытия: ' + train['time1'] + '<br>'
       bFirm = ''
       if 'bFirm' in train:
         bFirm = redFont0 + u' (фирменный)' + redFont1
-      out += u'номер поезда: ' + train['number'] + bFirm + '<br>'
+      out += u'&nbsp;номер поезда: ' + train['number'] + bFirm + '<br>'
       for car in train['cars']:
-        out += '---------------------<br>'
-        out += u'тип: ' + car['typeLoc'] + '<br>'
-        out += u'свободных мест: ' + str(car['freeSeats']) + '<br>'
-        out += u'цена: ' + str(car['tariff']) + '<br>'
-        out += '---------------------<br>'
+        out += '<hr color="gray" size="1" width="30%" align="left"/>'
+        out += u'&nbsp;тип: ' + car['typeLoc'] + '<br>'
+        freeSeats = car['freeSeats']
+        if int(freeSeats) <= 10:
+          freeSeats = '%s%s%s' % (redFont0, freeSeats, redFont1)
+        out += u'&nbsp;свободных мест: %s <br>' % freeSeats
+        out += u'&nbsp;цена: %s руб. <br>' % str(car['tariff'])
+        #out += '<hr color="gray" size="1" width="30%" align="left"/>'
   else:
     out += "Some error occured: " + str(r)
 
@@ -131,9 +138,9 @@ def getRidSid(st0, st1, date, s):
 class MainPage(webapp2.RequestHandler):
   
   def get(self):
-    global mainPage
-    if not mainPage:
-      mainPage = getMainPage()
+    #global mainPage
+    #if not mainPage:
+    mainPage = getMainPage()
     self.response.out.write(mainPage)
 
 def getProperDate(date):
@@ -143,6 +150,7 @@ def getProperDate(date):
     sOut = ('%s.%s.%s' % (items[1], items[0], items[2]))
   except (IndexError):
     logging.error('IndexError: ' + date)
+    sOut = datetime.today().strftime("%d.%m.%Y")
   return sOut
 
 class TrainListPage(webapp2.RequestHandler):
@@ -152,7 +160,6 @@ class TrainListPage(webapp2.RequestHandler):
   def post(self):
       self.response.out.write('<html><body>Результаты поиска:<pre>')
       st0  = cgi.escape(self.request.get('from'))
-      storage.addReq(st0)
       st1  = cgi.escape(self.request.get('to'))
       date = getProperDate(cgi.escape(self.request.get('date')))
       
@@ -216,27 +223,13 @@ class SuggesterPage(webapp2.RequestHandler):
 class SummaryMailPage(webapp2.RequestHandler):
 
   def get(self):
-    #sendMail(storage.getReq())
     pass
-
-class TestPage(webapp2.RequestHandler):
-
-  def get(self):
-      #resp = opener.open('http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%D0%B9%D0%B9%D0%B9')
-      #sendMail()
-      #self.response.out.write(resp.read())
-      #global suggestDict
-      #for k in suggestDict.keys():
-      #  self.response.out.write(k+'<br>')
-      #storage.addUser('test@email.me')
-      self.response.out.write(storage.getReq())
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/trains', TrainListPage),
     ('/suggester', SuggesterPage),
     ('/summary_mail', SummaryMailPage),
-    ('/test', TestPage)
 ], debug=True)
 
 #def main():

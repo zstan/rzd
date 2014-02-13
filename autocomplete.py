@@ -10,7 +10,7 @@ def getMainPage():
    </head>
       <body>
        <form action="/trains" method="post">
-         <H2>Поиск билетов на РЖД</H2>
+         <H2><font color="red">Поиск билетов на РЖД</font></H2>
          <div class="ui-widget">
            <input class="suggest" id="from" type="search" name="from" size="30" placeholder="откуда" tabindex="0" required="true">
          </div>
@@ -19,7 +19,7 @@ def getMainPage():
            <input class="suggest" id="to" type="search" name="to" size="30" placeholder="куда" tabindex="1" required="true">
          </div>
          <br>
-         <div><input type="text" id="datepicker" name="date" tabindex="2" placeholder="дата" required="true" readonly></div>
+         <div><input type="text" id="datepicker" name="date" tabindex="2" placeholder="дата" required="true" readonly="true"></div>
          <br>
          <div><input type="submit" value="мне повезет" tabindex="3"></div>
        </form>
@@ -32,9 +32,9 @@ def getMainPage():
 def getCurrentGoogleUser():
   user = users.get_current_user()
   if not user:      
-      return "<br><br>You are not looged in google or haven`t accout"
+      return '<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><font color="red">You are not looged in google or haven`t accout, </font><a href="%s">log in</a><br>' % users.create_login_url()
   else:
-      return "<br><br>Hello, %s, %s! " % (user.nickname(), user.email())
+      return '<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><font color="red">Hello, %s, %s! </font>' % (user.nickname(), user.email())
 
 def getAutocomplete():
   return """

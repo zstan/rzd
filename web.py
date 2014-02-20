@@ -4,60 +4,131 @@
 import cgi, os
 
 from google.appengine.api import users
-from time import sleep
-from httplib import HTTPException, HTTPConnection
-import webapp2, httplib
-import urllib, urllib2, cookielib, json
-from autocomplete import getMainPage
-from mail import sendMail
 from google.appengine.runtime import DeadlineExceededError
-import logging, storage
+
+from time import sleep
 from datetime import datetime
 
-mainPage = None # temporary stub !!!
+from startpage import getMainPage
+from mail import sendMail
+from common import getResponse, getResponseStub, getCurrentGoogleUserCode
+
+import storage
+
+import webapp2
+import urllib, urllib2, cookielib, json, urlparse
+import logging, time
+
+
 suggestDict = {}
 suggestDictSize = 5000
 
 redFont0 = '<font size=\"2\" color=\"red\">'
-redFont1 = '</font>'
-
-def getResponse(url, opener = None):
-  good = False
-  while not good:
-    try:
-      resp = None
-      if not opener:
-        resp = urllib2.urlopen(url, timeout=5)
-      else:
-        resp = opener.open(url, timeout=5)
-      if resp.getcode() in [httplib.OK, httplib.CREATED, httplib.ACCEPTED]:
-        good = True
-    except (urllib2.HTTPError, HTTPException):
-      pass
-  return resp.read()
-
-def getResponseStub(url, opener):
-  r = json.loads(getResponse(url, opener))
-  cnt = 0
-  while (r['result']!='OK' and cnt < 5):
-    sleep(1)
-    cnt+=1
-    r = json.loads(getResponse(url, opener))
-  return r
+grayFont0 = '<font size=\"2\" color=\"#B3B3B3\">' 
+fontClose = '</font>'
+NoSeats = '<br>&nbsp;%s%s%s<br>' % (grayFont0, u'все билеты раскупили, негодяи:(', fontClose)
 
 def getCityId(city, s):
-  req = 'http://pass.rzd.ru/suggester?lang=ru&stationNamePart=' + urllib.quote(city.encode('utf-8'))
+  req = 'http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%s' % urllib.quote(city.encode('utf-8'))
   respData = getResponse(req)
   rJson = json.loads(respData)
   for item in rJson:
     if item['name'].lower() == city.lower():
-      s.response.out.write(u'Найден: '+item['name']+' -> '+str(item['id'])+'<br>')
-      return str(item['id'])
+      s.response.out.write(u'Найден: %s -> %s<br>' % (item['name'], item['id']))
+      return item['id']
   s.response.out.write(u'Не найден: '+city+'<br>')
   s.response.out.write(u'Выбранный вами город не найден, попробуйте еще раз:&nbsp;&nbsp;<a href="../">Вернуться</a><br>')
   #for item in rJson:
   #  s.response.out.write(item['name']+'<br>')
   return None
+
+def formResults(reqList, opener, trainNum4mail = None):
+
+  data2mail = ''
+
+  st0 = urllib.quote(reqList[0].encode('utf-8'))
+  st1 = urllib.quote(reqList[2].encode('utf-8'))
+
+  id0 = reqList[1]
+  id1 = reqList[3]
+
+  date = reqList[4]
+
+  #if not trainNum4mail:
+  #  data2mail = urllib.urlencode({'st0':st0, 'id0':reqList[1], 'st1':st1, 'id1':reqList[3], 'date':reqList[4]})
+
+  if (not id0 or not id1):
+    return
+
+  req1 = 'http://pass.rzd.ru/timetable/public/ru?STRUCTURE_ID=735&layer_id=5371&dir=0&tfl=3&checkSeats=0&withoutSeats=y&st0=%s&code0=%s&dt0=%s&st1=%s&code1=%s&dt1=%s' % (st0, id0, date, st1, id1, date)
+
+  out = '<html><body><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
+
+  r = json.loads(getResponse(req1, opener))
+  if (r['result'].lower()=='ok'):
+    try:
+      out += r['tp'][0]['msgList'][0]['message'] + '<br>'#errType      
+    except IndexError, e:
+      logging.error('msgList Error: ' + str(r))
+    return out
+  try:
+    sid = str(r['SESSION_ID'])
+    rid = str(r['rid'])
+  except KeyError, e:
+    logging.error('Error: ' + str(r))
+    return str(e)
+
+  req2 = req1+'&rid=%s&SESSION_ID=%s' % (rid, sid)
+
+  r = getResponseStub(req2, opener)
+  
+  out += '<form name="FinalAccept" method="get" action="sendme"><br>'
+  if ('tp' in r):
+    out += '<br>' + redFont0 + r['tp'][0]['from'] + ' -> '
+    out += r['tp'][0]['where'] + fontClose + '<br>'
+    out += r['tp'][0]['date'] + '<br>'
+    l_trains = r['tp'][0]['list']
+    for train in l_trains:
+
+      trainNum = train['number']
+      if trainNum4mail and trainNum4mail!=trainNum:
+        continue
+
+      out += '<hr color="red" size="3" width="50%" align="left"/><br>'
+
+      disableReport = 'disabled'
+
+      user = users.get_current_user()
+      disableReport = ''
+
+      if not trainNum4mail:
+        data2mail = ('%s|%s|%s|%s|%s|%s') % (reqList[0], reqList[1], reqList[2], reqList[3], reqList[4], trainNum)
+        out += u'<input type="radio" name="trainReq" %s onclick="this.form.submit();" value="%s">заказать отчет на почту<br><br>' % (disableReport, data2mail)
+      out += u'&nbsp;станция отправления: %s <br>' % train['station0']
+      out += u'&nbsp;станция прибытия: ' + train['station1'] + '<br>'
+      out += u'&nbsp;время в пути: ' + train['timeInWay'] + '<br>'
+      out += u'&nbsp;время отправления: ' + train['time0'] + '<br>'
+      out += u'&nbsp;время прибытия: ' + train['time1'] + '<br>'
+      bFirm = ''
+      if 'bFirm' in train:
+        bFirm = redFont0 + u' (фирменный)' + fontClose
+      out += u'&nbsp;номер поезда: %s %s<br>' % (trainNum, bFirm)
+      if len(train['cars'])==0:        
+        out += NoSeats
+      else:
+        for car in train['cars']:
+          out += '<hr color="gray" size="1" width="30%" align="left"/>'
+          out += u'&nbsp;тип: %s<br>' % car['typeLoc']
+          freeSeats = car['freeSeats']
+          if int(freeSeats) <= 10:
+            freeSeats = '%s%s%s' % (redFont0, freeSeats, fontClose)
+          out += u'&nbsp;свободных мест: %s <br>' % freeSeats
+          out += u'&nbsp;цена: %s руб. <br>' % car['tariff']
+  else:
+    out += "Some error occured: " + str(r)
+  out += '</form>'
+
+  return out
 
 def getRidSid(st0, st1, date, s):
   """
@@ -78,69 +149,14 @@ def getRidSid(st0, st1, date, s):
   id0 = getCityId(st0, s)
   id1 = getCityId(st1, s)
 
-  st0 = urllib.quote(st0.encode('utf-8'))
-  st1 = urllib.quote(st1.encode('utf-8'))
-
-  if (not id0 or not id1):
-    return
-  
-  req1 = 'http://pass.rzd.ru/timetable/public/ru?STRUCTURE_ID=735&layer_id=5371&dir=0&tfl=3&checkSeats=1&st0=%s&code0=%s&dt0=%s&st1=%s&code1=%s&dt1=%s' % (st0, id0, date, st1, id1, date)
-
-  r = json.loads(getResponse(req1, s.opener))
-  if (r['result'].lower()=='ok'):
-    s.response.out.write(r['tp'][0]['msgList'][0]['message']) #errType
-    s.response.out.write('<br>')
-    #s.response.out.write(r)
-    return
-  try:
-    sid = str(r['SESSION_ID'])
-    rid = str(r['rid'])
-  except Exception, e:
-    logging.error('Error: ' + str(r))
-
-  req2 = req1+'&rid=%s&SESSION_ID=%s' % (rid, sid)
-
-  r = getResponseStub(req2, s.opener)
-  
-  out = '<html><body><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
-  if ('tp' in r):
-    out += '<br>' + redFont0 + r['tp'][0]['from'] + ' -> '
-    out += r['tp'][0]['where'] + redFont1 + '<br>'
-    out += r['tp'][0]['date'] + '<br>'
-    l_trains = r['tp'][0]['list']
-    #print l_trains
-    for train in l_trains:
-      out += '<hr color="red" size="3" width="50%" align="left"/><br>'
-      out += u'<input type="radio" name="radAnswer" id=%s/ disabled="true">заказать отчет на почту<br><br>' % req1
-      out += u'&nbsp;станция отправления: %s <br>' % train['station0']
-      out += u'&nbsp;станция прибытия: ' + train['station1'] + '<br>'
-      out += u'&nbsp;время в пути: ' + train['timeInWay'] + '<br>'
-      out += u'&nbsp;время отправления: ' + train['time0'] + '<br>'
-      out += u'&nbsp;время прибытия: ' + train['time1'] + '<br>'
-      bFirm = ''
-      if 'bFirm' in train:
-        bFirm = redFont0 + u' (фирменный)' + redFont1
-      out += u'&nbsp;номер поезда: ' + train['number'] + bFirm + '<br>'
-      for car in train['cars']:
-        out += '<hr color="gray" size="1" width="30%" align="left"/>'
-        out += u'&nbsp;тип: ' + car['typeLoc'] + '<br>'
-        freeSeats = car['freeSeats']
-        if int(freeSeats) <= 10:
-          freeSeats = '%s%s%s' % (redFont0, freeSeats, redFont1)
-        out += u'&nbsp;свободных мест: %s <br>' % freeSeats
-        out += u'&nbsp;цена: %s руб. <br>' % str(car['tariff'])
-        #out += '<hr color="gray" size="1" width="30%" align="left"/>'
-  else:
-    out += "Some error occured: " + str(r)
-
+  out = formResults((st0, id0, st1, id1, date), s.opener)
   s.response.out.write(out)
+  
 
 class MainPage(webapp2.RequestHandler):
   
   def get(self):
-    #global mainPage
-    #if not mainPage:
-    mainPage = getMainPage()
+    mainPage = getMainPage() % getCurrentGoogleUserCode()
     self.response.out.write(mainPage)
 
 def getProperDate(date):
@@ -150,7 +166,7 @@ def getProperDate(date):
     sOut = ('%s.%s.%s' % (items[1], items[0], items[2]))
   except (IndexError):
     logging.error('IndexError: ' + date)
-    sOut = datetime.today().strftime("%d.%m.%Y")
+    sOut = time.strftime('%d.%m.%Y', time.gmtime(time.time() + 14400)) # mega fake, wan`t use pytz
   return sOut
 
 class TrainListPage(webapp2.RequestHandler):
@@ -161,6 +177,7 @@ class TrainListPage(webapp2.RequestHandler):
       self.response.out.write('<html><body>Результаты поиска:<pre>')
       st0  = cgi.escape(self.request.get('from'))
       st1  = cgi.escape(self.request.get('to'))
+      storage.addReq('%s -> %s' % (st0, st1))
       date = getProperDate(cgi.escape(self.request.get('date')))
       
       try:
@@ -178,37 +195,38 @@ class SuggesterPage(webapp2.RequestHandler):
         suggOut = '[]'
 
         try:
-            station = self.request.get('stationNamePart')
+          station = self.request.get('stationNamePart')
+          stationKey = station[:3]
 
-            if station in suggestDict:
-              self.response.out.write(suggestDict[station])
-              return
+          sStations = set()
 
+          if stationKey in suggestDict:
+            sStations = suggestDict[stationKey]
+          else:
             req='http://pass.rzd.ru/suggester?lang=ru&stationNamePart='+urllib.quote(station.encode('utf-8'))
             respData = getResponse(req)
 
             if len(respData) > 0:
               rJson = json.loads(respData)
-              suggOut = '['
-              cnt = 1
-              sStations = set()
               for item in rJson:
-                if item['name'] not in sStations:
-                  sStations.add(item['name'])
-              lStations = self.sort4Find(sStations, station.lower())[:15]
-              for item in lStations:
-                  suggOut += '{\"id\":\"'+str(cnt)+'\",\"label\":\"'+item+'\",\"value\":\"'+item+'\"},'
-                  cnt += 1
-              suggOut = suggOut[:-1]
-              suggOut += ']'
+                sStations.add(item['name'])
 
-            if len(suggestDict) < suggestDictSize: #one more stub !!!
-              suggestDict[station] = suggOut
+          suggOut = '['              
+          lStations = self.sort4Find(sStations, station.lower())[:15]
+          cnt = 1
+          for item in lStations:
+            suggOut += '{"id":"%d","label":"%s","value":"%s"},' % (cnt, item, item)
+            cnt += 1
+          suggOut = suggOut[:-1]
+          suggOut += ']'
 
-            self.response.out.write(suggOut)
+          if len(suggestDict) < suggestDictSize: #one more stub !!!
+            suggestDict[stationKey] = sStations
+
+          self.response.out.write(suggOut)
 
         except (TypeError, ValueError):
-            self.response.out.write(suggOut)
+          self.response.out.write(suggOut)
 
     def sort4Find(self, sStations, suggest):
       l0 = []
@@ -220,15 +238,39 @@ class SuggesterPage(webapp2.RequestHandler):
           l1.append(station)
       return l0 + l1
 
-class SummaryMailPage(webapp2.RequestHandler):
+class SendMePage(webapp2.RequestHandler):
 
   def get(self):
-    pass
+    ret = storage.addUserTrainReq(self.request.get('trainReq'))
+    self.response.out.write(str(ret))
+    #params = self.request.get('trainReq').split('|')
+    #req = urllib.unquote(params[0])
+    #trainNum = urllib.unquote(params[5])
+    #params = urlparse.parse_qs(self.request.get('trainReq'))
+    #params = params['st0']
+    #self.response.out.write(params)
+    #self.response.out.write(self.request.get('trainReq'))
+
+class SummaryMailPage(webapp2.RequestHandler):
+
+  cj = cookielib.CookieJar()
+  opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+
+  def get(self):
+    reqs = storage.getMailPlan()
+    if len(reqs):
+      for item in reqs:
+        logging.info('send: ' + str(item.reqProps)+item.reqProps[5])
+        results = formResults(item.reqProps, self.opener, item.reqProps[5])
+        sendMail(item.account.email(), results)
+    else:
+      logging.info('recipients list empty')
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/trains', TrainListPage),
     ('/suggester', SuggesterPage),
+    ('/sendme', SendMePage),
     ('/summary_mail', SummaryMailPage),
 ], debug=True)
 

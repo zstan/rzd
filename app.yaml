@@ -1,4 +1,4 @@
-application: rzdzstan1
+application: rzdzstan0
 version: 1
 runtime: python27
 threadsafe: true
@@ -26,6 +26,10 @@ handlers:
   script: web.app
   login: admin
 
+- url: /stat
+  script: web.app
+  login: admin
+
 - url: /.*
   script: web.app
 
@@ -34,7 +38,7 @@ libraries:
   version: "latest"
 
 error_handlers:
-  - file: /themes/default_error.html
+  - file: err/default_error.html
 
   - error_code: over_quota
-    file: /themesover_quota.html
+    file: err/over_quota.html

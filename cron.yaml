@@ -1,4 +1,4 @@
 cron:
 - description: mail summary job
   url: /summary_mail
-  schedule: every 3 hours
+  schedule: every 1 hours

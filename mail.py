@@ -1,8 +1,9 @@
 
 from google.appengine.api import mail
 
-def sendMail(body):
-  mail.send_mail(sender="rzd.ru Support <@gmail.com>",
-                to="@mail.ru <@mail.ru>",
+def sendMail(toAddr, body):
+  mail.send_mail(sender="rzd wrapper support <robot.rzd@gmail.com>",
+                to=toAddr,
                 subject="train report",
+                html=body,
                 body=body)

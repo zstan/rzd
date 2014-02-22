@@ -36,26 +36,17 @@ def getCityId(city, s):
     if item['name'].lower() == city.lower():
       s.response.out.write(u'Найден: %s -> %s<br>' % (item['name'], item['id']))
       return item['id']
-  s.response.out.write(u'Не найден: '+city+'<br>')
+  s.response.out.write(u'Не найден: %s<br>' % city)
   s.response.out.write(u'Выбранный вами город не найден, попробуйте еще раз:&nbsp;&nbsp;<a href="../">Вернуться</a><br>')
-  #for item in rJson:
-  #  s.response.out.write(item['name']+'<br>')
   return None
 
 def formResults(reqList, opener, trainNum4mail = None):
 
-  data2mail = ''
-
-  st0 = urllib.quote(reqList[0].encode('utf-8'))
-  st1 = urllib.quote(reqList[2].encode('utf-8'))
-
-  id0 = reqList[1]
-  id1 = reqList[3]
-
+  st0  = urllib.quote(reqList[0].encode('utf-8'))
+  st1  = urllib.quote(reqList[2].encode('utf-8'))
+  id0  = reqList[1]
+  id1  = reqList[3]
   date = reqList[4]
-
-  #if not trainNum4mail:
-  #  data2mail = urllib.urlencode({'st0':st0, 'id0':reqList[1], 'st1':st1, 'id1':reqList[3], 'date':reqList[4]})
 
   if (not id0 or not id1):
     return
@@ -96,13 +87,15 @@ def formResults(reqList, opener, trainNum4mail = None):
 
       out += '<hr color="red" size="3" width="50%" align="left"/><br>'
 
-      disableReport = 'disabled'
+      #disableReport = 'disabled'
 
       user = users.get_current_user()
-      disableReport = ''
+      #if user and user.email() in ['test@example.com']:
+      if user:
+        disableReport = ''
 
       if not trainNum4mail:
-        data2mail = ('%s|%s|%s|%s|%s|%s') % (reqList[0], reqList[1], reqList[2], reqList[3], reqList[4], trainNum)
+        data2mail = ('%s|%s|%s|%s|%s|%s') % (reqList[0], reqList[1], reqList[2], reqList[3], date + '.' + train['time0'].split(':')[0], trainNum)
         out += u'<input type="radio" name="trainReq" %s onclick="this.form.submit();" value="%s">заказать отчет на почту<br><br>' % (disableReport, data2mail)
       out += u'&nbsp;станция отправления: %s <br>' % train['station0']
       out += u'&nbsp;станция прибытия: ' + train['station1'] + '<br>'
@@ -203,7 +196,7 @@ class SuggesterPage(webapp2.RequestHandler):
           if stationKey in suggestDict:
             sStations = suggestDict[stationKey]
           else:
-            req='http://pass.rzd.ru/suggester?lang=ru&stationNamePart='+urllib.quote(station.encode('utf-8'))
+            req = 'http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%s' % urllib.quote(station.encode('utf-8'))
             respData = getResponse(req)
 
             if len(respData) > 0:
@@ -243,13 +236,6 @@ class SendMePage(webapp2.RequestHandler):
   def get(self):
     ret = storage.addUserTrainReq(self.request.get('trainReq'))
     self.response.out.write(str(ret))
-    #params = self.request.get('trainReq').split('|')
-    #req = urllib.unquote(params[0])
-    #trainNum = urllib.unquote(params[5])
-    #params = urlparse.parse_qs(self.request.get('trainReq'))
-    #params = params['st0']
-    #self.response.out.write(params)
-    #self.response.out.write(self.request.get('trainReq'))
 
 class SummaryMailPage(webapp2.RequestHandler):
 
@@ -266,16 +252,21 @@ class SummaryMailPage(webapp2.RequestHandler):
     else:
       logging.info('recipients list empty')
 
+class StatPage(webapp2.RequestHandler):
+
+  def get(self):
+    #resp = opener.open('http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%D0%B9%D0%B9%D0%B9')
+    #sendMail()
+    #self.response.out.write(resp.read())
+    self.response.out.write(storage.getUsers())
+    self.response.out.write('<br><br>')
+    self.response.out.write(storage.getReq()+'<br>')
+
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/trains', TrainListPage),
     ('/suggester', SuggesterPage),
     ('/sendme', SendMePage),
     ('/summary_mail', SummaryMailPage),
-], debug=True)
-
-#def main():
-#    application.run()
-
-#if __name__ == "__main__":
-#    main()
+    ('/stat', StatPage)
+], debug=False)

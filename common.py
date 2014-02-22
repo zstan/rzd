@@ -4,6 +4,7 @@
 from google.appengine.api import users
 
 import urllib2, httplib, json
+from time import sleep
 
 def getResponse(url, opener = None):
   good = False
@@ -16,7 +17,7 @@ def getResponse(url, opener = None):
         resp = opener.open(url, timeout=5)
       if resp.getcode() in [httplib.OK, httplib.CREATED, httplib.ACCEPTED]:
         good = True
-    except (urllib2.HTTPError, HTTPException):
+    except (urllib2.HTTPError, httplib.HTTPException):
       pass
   return resp.read()
 

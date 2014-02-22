@@ -17,6 +17,7 @@ class User(ndb.Model):
   date      = ndb.DateTimeProperty(auto_now_add=True)
   premium   = ndb.BooleanProperty()
   active    = ndb.BooleanProperty()
+  rejectHash= ndb.StringProperty()
   reservedS = ndb.StringProperty()
   reservedI = ndb.IntegerProperty()
 
@@ -30,7 +31,7 @@ def addUserTrainReq(reqProps):
 
     items = reqProps.split('|')
     ditems = items[4].split('.')
-    d1 = datetime(year=int(ditems[2]), month=int(ditems[1]), day=int(ditems[0]))
+    d1 = datetime(year=int(ditems[2]), month=int(ditems[1]), day=int(ditems[0]), hour=int(ditems[3]))
 
     q = User.query()
     logging.info('fetch user: ' + user.email())
@@ -41,23 +42,21 @@ def addUserTrainReq(reqProps):
                date = d1,
                reqProps = items, active = True)
       u.put()
-      return True
+      return 'request registred'
 
     else:
       logging.info('update already exist user: ' + user.email())
-      if not r[0].active:              
-        r[0].active = True
-        r[0].reqCount = r[0].reqCount + 1
-        r[0].date = d1
-        r[0].reqProps = items
-        #r[0].key.delete()
-        r[0].put()
-        return True
+      currentUserInfo = r[0]
+      if not currentUserInfo.active:              
+        currentUserInfo.active = True
+        currentUserInfo.reqCount = currentUserInfo.reqCount + 1
+        currentUserInfo.date = d1
+        currentUserInfo.reqProps = items
+        currentUserInfo.put()
+        return 'request registred'
       else:
-        logging.info('can\'t update you already have active req: ' + user.email())
-        return False
-
-  return False
+        logging.info('can\'t update already have active req: ' + user.email())
+        return 'can\'t register request, already have active request'
 
 def getMailPlan():
   d0 = datetime.fromtimestamp(time.time() + 14400)
@@ -65,7 +64,6 @@ def getMailPlan():
   sendList = []
   for result in q:
     if (result.date < d0):
-      #result.key.delete()
       result.active = False
       logging.info('disable user activity by time: ' + result.account.email())
       result.put()

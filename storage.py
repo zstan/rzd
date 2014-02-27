@@ -7,6 +7,7 @@ import logging
 
 import time
 from datetime import datetime
+from myhashlib import getHashForUser
 
 class User(ndb.Model):
   email     = ndb.StringProperty()
@@ -17,7 +18,7 @@ class User(ndb.Model):
   date      = ndb.DateTimeProperty(auto_now_add=True)
   premium   = ndb.BooleanProperty()
   active    = ndb.BooleanProperty()
-  rejectHash= ndb.StringProperty()
+  accHash   = ndb.StringProperty()
   reservedS = ndb.StringProperty()
   reservedI = ndb.IntegerProperty()
 
@@ -40,7 +41,7 @@ def addUserTrainReq(reqProps):
     if not len(r):
       u = User(account=user,
                date = d1,
-               reqProps = items, active = True)
+               reqProps = items, active = True, accHash = getHashForUser(user))
       u.put()
       return 'request registred'
 
@@ -71,12 +72,23 @@ def getMailPlan():
       sendList.append(result)
   return sendList
 
+def disableTrainReq(h):
+  logging.info('disable hash: %s' % h)
+  q = User.query().filter(User.accHash == h)
+  r = q.fetch(1)
+  if len(r):
+    logging.info('found hash')
+    currentUserInfo = r[0]
+    currentUserInfo.active = False
+    currentUserInfo.put()
+    return 'request disabled'
+
 def getUsers():
   #clearStorage() # !!!!
   q = User.query().fetch()
   sOut = ''
   for result in q:
-    sOut += "%s active=%s reqCount=%d" % (result.account.email(), str(result.active), result.reqCount)
+    sOut += "%s active=%s reqCount=%d hash=%s" % (result.account.email(), str(result.active), result.reqCount, result.accHash)
   return sOut
 
 def addReq(req):

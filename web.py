@@ -27,6 +27,7 @@ redFont0 = '<font size=\"2\" color=\"red\">'
 grayFont0 = '<font size=\"2\" color=\"#B3B3B3\">' 
 fontClose = '</font>'
 NoSeats = '<br>&nbsp;%s%s%s<br>' % (grayFont0, u'все билеты раскупили, негодяи:(', fontClose)
+domainPrefix = 'rzdzstan0'
 
 def getCityId(city, s):
   req = 'http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%s' % urllib.quote(city.encode('utf-8'))
@@ -34,13 +35,16 @@ def getCityId(city, s):
   rJson = json.loads(respData)
   for item in rJson:
     if item['name'].lower() == city.lower():
-      s.response.out.write(u'Найден: %s -> %s<br>' % (item['name'], item['id']))
+      s.response.out.write(u'Найден: %s : %s<br>' % (item['name'], item['id']))
       return item['id']
   s.response.out.write(u'Не найден: %s<br>' % city)
   s.response.out.write(u'Выбранный вами город не найден, попробуйте еще раз:&nbsp;&nbsp;<a href="../">Вернуться</a><br>')
   return None
 
-def formResults(reqList, opener, trainNum4mail = None):
+def formResults(reqList, opener, item = None):
+
+  if item:
+    trainNum4mail = item.reqProps[5]
 
   st0  = urllib.quote(reqList[0].encode('utf-8'))
   st1  = urllib.quote(reqList[2].encode('utf-8'))
@@ -58,7 +62,7 @@ def formResults(reqList, opener, trainNum4mail = None):
   r = json.loads(getResponse(req1, opener))
   if (r['result'].lower()=='ok'):
     try:
-      out += r['tp'][0]['msgList'][0]['message'] + '<br>'#errType      
+      out += r['tp'][0]['msgList'][0]['message'] + '<br>'
     except IndexError, e:
       logging.error('msgList Error: ' + str(r))
     return out
@@ -75,26 +79,26 @@ def formResults(reqList, opener, trainNum4mail = None):
   
   out += '<form name="FinalAccept" method="get" action="sendme"><br>'
   if ('tp' in r):
-    out += '<br>' + redFont0 + r['tp'][0]['from'] + ' -> '
-    out += r['tp'][0]['where'] + fontClose + '<br>'
-    out += r['tp'][0]['date'] + '<br>'
-    l_trains = r['tp'][0]['list']
+    r = r['tp'][0]
+    out += '<br>' + redFont0 + r['from'] + ' -> '
+    out += r['where'] + fontClose + '<br>'
+    out += r['date'] + '<br>'
+    l_trains = r['list']
     for train in l_trains:
 
       trainNum = train['number']
-      if trainNum4mail and trainNum4mail!=trainNum:
+      if item and trainNum4mail!=trainNum:
         continue
 
       out += '<hr color="red" size="3" width="50%" align="left"/><br>'
 
-      #disableReport = 'disabled'
-
+      disableReport = 'disabled'
       user = users.get_current_user()
       #if user and user.email() in ['test@example.com']:
       if user:
         disableReport = ''
 
-      if not trainNum4mail:
+      if not item:
         data2mail = ('%s|%s|%s|%s|%s|%s') % (reqList[0], reqList[1], reqList[2], reqList[3], date + '.' + train['time0'].split(':')[0], trainNum)
         out += u'<input type="radio" name="trainReq" %s onclick="this.form.submit();" value="%s">заказать отчет на почту<br><br>' % (disableReport, data2mail)
       out += u'&nbsp;станция отправления: %s <br>' % train['station0']
@@ -117,9 +121,13 @@ def formResults(reqList, opener, trainNum4mail = None):
             freeSeats = '%s%s%s' % (redFont0, freeSeats, fontClose)
           out += u'&nbsp;свободных мест: %s <br>' % freeSeats
           out += u'&nbsp;цена: %s руб. <br>' % car['tariff']
+    if item:
+      out += u'<br><a href="http://www.%s.appspot.com/sendme?reject=%s">Отписаться</a>' % (domainPrefix, item.accHash)
+
   else:
     out += "Some error occured: " + str(r)
-  out += '</form>'
+  #out += '</form></body></html>'
+  out += '</form></body></html>'
 
   return out
 
@@ -234,8 +242,15 @@ class SuggesterPage(webapp2.RequestHandler):
 class SendMePage(webapp2.RequestHandler):
 
   def get(self):
-    ret = storage.addUserTrainReq(self.request.get('trainReq'))
-    self.response.out.write(str(ret))
+    trainReq    = self.request.get('trainReq')
+    trainReject = self.request.get('reject')
+    if (trainReq):
+      logging.info('trainReq')
+      ret = storage.addUserTrainReq(self.request.get('trainReq'))
+      self.response.out.write(str(ret))
+    elif (trainReject):
+      logging.info('trainReject')
+      storage.disableTrainReq(trainReject)
 
 class SummaryMailPage(webapp2.RequestHandler):
 
@@ -246,9 +261,9 @@ class SummaryMailPage(webapp2.RequestHandler):
     reqs = storage.getMailPlan()
     if len(reqs):
       for item in reqs:
-        logging.info('send: ' + str(item.reqProps)+item.reqProps[5])
-        results = formResults(item.reqProps, self.opener, item.reqProps[5])
-        sendMail(item.account.email(), results)
+        logging.info('send train: ' + item.reqProps[5])
+        results = formResults(item.reqProps, self.opener, item)
+        sendMail(item.account, results)
     else:
       logging.info('recipients list empty')
 
@@ -256,11 +271,10 @@ class StatPage(webapp2.RequestHandler):
 
   def get(self):
     #resp = opener.open('http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%D0%B9%D0%B9%D0%B9')
-    #sendMail()
     #self.response.out.write(resp.read())
     self.response.out.write(storage.getUsers())
-    self.response.out.write('<br><br>')
-    self.response.out.write(storage.getReq()+'<br>')
+    self.response.out.write('\n\n')
+    self.response.out.write(storage.getReq()+'\n')
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),

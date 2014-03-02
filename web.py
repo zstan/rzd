@@ -27,7 +27,7 @@ redFont0 = '<font size=\"2\" color=\"red\">'
 grayFont0 = '<font size=\"2\" color=\"#B3B3B3\">' 
 fontClose = '</font>'
 NoSeats = '<br>&nbsp;%s%s%s<br>' % (grayFont0, u'все билеты раскупили, негодяи:(', fontClose)
-domainPrefix = 'rzdzstan0'
+domainPrefix = 'rzdzstan1'
 
 def getCityId(city, s):
   req = 'http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%s' % urllib.quote(city.encode('utf-8'))
@@ -267,20 +267,10 @@ class SummaryMailPage(webapp2.RequestHandler):
     else:
       logging.info('recipients list empty')
 
-class StatPage(webapp2.RequestHandler):
-
-  def get(self):
-    #resp = opener.open('http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%D0%B9%D0%B9%D0%B9')
-    #self.response.out.write(resp.read())
-    self.response.out.write(storage.getUsers())
-    self.response.out.write('\n\n')
-    self.response.out.write(storage.getReq()+'\n')
-
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/trains', TrainListPage),
     ('/suggester', SuggesterPage),
     ('/sendme', SendMePage),
     ('/summary_mail', SummaryMailPage),
-    ('/stat', StatPage)
 ], debug=False)

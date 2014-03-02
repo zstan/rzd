@@ -7,7 +7,14 @@ import logging
 
 import time
 from datetime import datetime
-from myhashlib import getHashForUser
+
+def getHashForUser(user):
+  return 'new hash'
+
+try:
+  from myhashlib import getHashForUser
+except (ImportError):
+  print 'myhashlib ImportError'
 
 class User(ndb.Model):
   email     = ndb.StringProperty()
@@ -111,3 +118,4 @@ def getReq():
 
 def clearStorage():
   ndb.delete_multi(User.query().fetch(keys_only=True))
+  ndb.delete_multi(Req.query().fetch(keys_only=True))

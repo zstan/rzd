@@ -12,9 +12,9 @@ def getResponse(url, opener = None):
     try:
       resp = None
       if not opener:
-        resp = urllib2.urlopen(url, timeout=5)
+        resp = urllib2.urlopen(url, timeout=60)
       else:
-        resp = opener.open(url, timeout=5)
+        resp = opener.open(url, timeout=60)
       if resp.getcode() in [httplib.OK, httplib.CREATED, httplib.ACCEPTED]:
         good = True
     except (urllib2.HTTPError, httplib.HTTPException):

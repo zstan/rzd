@@ -95,7 +95,7 @@ def getUsers():
   q = User.query().fetch()
   sOut = ''
   for result in q:
-    sOut += "%s active=%s reqCount=%d hash=%s" % (result.account.email(), str(result.active), result.reqCount, result.accHash)
+    sOut += "%s active=%s reqCount=%d hash=%s <br>" % (result.account.email(), str(result.active), result.reqCount, result.accHash)
   return sOut
 
 def addReq(req):
@@ -115,6 +115,9 @@ def getReq():
   for result in q:
     sOut += "%s %s\n" % (result.reqProps, str(result.date))
   return sOut
+
+def clearReq():
+  ndb.delete_multi(Req.query().fetch(keys_only=True))
 
 def clearStorage():
   ndb.delete_multi(User.query().fetch(keys_only=True))

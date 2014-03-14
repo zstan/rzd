@@ -1,0 +1,6 @@
+backends:
+- name: backendone
+  start: backendtrial.py
+  class: B1
+  instances: 1
+  options: dynamic

@@ -3,8 +3,13 @@
 
 import cgi, os
 
+import threading
+
 from google.appengine.api import users
 from google.appengine.runtime import DeadlineExceededError
+from google.appengine.api import backends
+from google.appengine.api import urlfetch
+from google.appengine.api import taskqueue
 
 from time import sleep
 from datetime import datetime
@@ -27,16 +32,19 @@ redFont0 = '<font size=\"2\" color=\"red\">'
 grayFont0 = '<font size=\"2\" color=\"#B3B3B3\">' 
 fontClose = '</font>'
 NoSeats = '<br>&nbsp;%s%s%s<br>' % (grayFont0, u'все билеты раскупили, негодяи:(', fontClose)
-domainPrefix = 'rzdzstan1'
+domainPrefix = 'rzdzstan0'
 
 def getCityId(city, s):
   req = 'http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%s' % urllib.quote(city.encode('utf-8'))
   respData = getResponse(req)
-  rJson = json.loads(respData)
-  for item in rJson:
-    if item['name'].lower() == city.lower():
-      s.response.out.write(u'Найден: %s : %s<br>' % (item['name'], item['id']))
-      return item['id']
+  try:
+    rJson = json.loads(respData)
+    for item in rJson:
+      if item['name'].lower() == city.lower():
+        s.response.out.write(u'Найден: %s : %s<br>' % (item['name'], item['id']))
+        return item['id']
+  except ValueError, e:
+    logging.error('getCityId err: %s %s' % (respData, city))
   s.response.out.write(u'Не найден: %s<br>' % city)
   s.response.out.write(u'Выбранный вами город не найден, попробуйте еще раз:&nbsp;&nbsp;<a href="../">Вернуться</a><br>')
   return None
@@ -53,7 +61,7 @@ def formResults(reqList, opener, item = None):
   date = reqList[4]
 
   if (not id0 or not id1):
-    return
+    return None
 
   req1 = 'http://pass.rzd.ru/timetable/public/ru?STRUCTURE_ID=735&layer_id=5371&dir=0&tfl=3&checkSeats=0&withoutSeats=y&st0=%s&code0=%s&dt0=%s&st1=%s&code1=%s&dt1=%s' % (st0, id0, date, st1, id1, date)
 
@@ -71,7 +79,7 @@ def formResults(reqList, opener, item = None):
     rid = str(r['rid'])
   except KeyError, e:
     logging.error('Error: ' + str(r))
-    return str(e)
+    return None
 
   req2 = req1+'&rid=%s&SESSION_ID=%s' % (rid, sid)
 
@@ -253,19 +261,44 @@ class SendMePage(webapp2.RequestHandler):
       storage.disableTrainReq(trainReject)
 
 class SummaryMailPage(webapp2.RequestHandler):
-
+  """
   cj = cookielib.CookieJar()
   opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
 
   def get(self):
     reqs = storage.getMailPlan()
+    logging.info('getMailPlan ' + str(len(reqs)))
     if len(reqs):
       for item in reqs:
         logging.info('send train: ' + item.reqProps[5])
-        results = formResults(item.reqProps, self.opener, item)
-        sendMail(item.account, results)
+        results = formResults(item.reqProps, opener, item)
+        if results:
+          sendMail(item.account, results)
     else:
       logging.info('recipients list empty')
+  """
+  def get(self):
+    name = backends.get_url('backendone')
+    logging.info('get resp ' + name+'/backend/summary_mail')
+    respData = urlfetch.fetch(name+'/backend/summary_mail', method='POST')
+    logging.info(respData.content)
+
+class StatPage(webapp2.RequestHandler):
+
+  def get(self):
+    #resp = opener.open('http://pass.rzd.ru/suggester?lang=ru&stationNamePart=%D0%B9%D0%B9%D0%B9')
+    #self.response.out.write(resp.read())
+    clear = self.request.get('cl')
+    if (clear):
+      storage.clearReq()
+    self.response.out.write(storage.getUsers())
+    self.response.out.write('\n\n')
+    self.response.out.write(storage.getReq()+'\n')
+
+class ScriptTest(webapp2.RequestHandler):
+  def get(self):
+    name = backends.get_url('backendone')
+    self.response.write('Backend[%s]'%(name))
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
@@ -273,4 +306,6 @@ app = webapp2.WSGIApplication([
     ('/suggester', SuggesterPage),
     ('/sendme', SendMePage),
     ('/summary_mail', SummaryMailPage),
+    ('/stat', StatPage),
+    ('/test', ScriptTest)
 ], debug=False)

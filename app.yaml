@@ -1,4 +1,4 @@
-application: rzdzstan1
+application: rzdzstan0
 version: 1
 runtime: python27
 threadsafe: true
@@ -14,6 +14,9 @@ handlers:
 - url: /favicon.ico
   static_files: favicon.ico
   upload: favicon.ico
+
+- url: /backend/summary_mail
+  script: backendtrial.app
 
 - url: /robots.txt
   static_files: robots.txt

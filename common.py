@@ -6,6 +6,9 @@ from google.appengine.api import users
 import urllib2, httplib, json
 from time import sleep
 
+redFont0 = '<font size=\"2\" color=\"red\">'
+fontClose = '</font>'
+
 def getResponse(url, opener = None):
   good = False
   while not good:

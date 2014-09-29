@@ -7,6 +7,7 @@ import logging
 
 import time
 from datetime import datetime
+from common import redFont0, fontClose
 
 def getHashForUser(user):
   return 'new hash'
@@ -95,7 +96,10 @@ def getUsers():
   q = User.query().fetch()
   sOut = ''
   for result in q:
-    sOut += "%s active=%s reqCount=%d hash=%s <br>" % (result.account.email(), str(result.active), result.reqCount, result.accHash)
+    if result.active:
+      sOut += "%s active=%s%s%s reqCount=%d <br>" % (result.account.email(), redFont0, str(result.active), fontClose, result.reqCount)
+    else:
+      sOut += "%s active=%s reqCount=%d <br>" % (result.account.email(), str(result.active), result.reqCount)
   return sOut
 
 def addReq(req):
@@ -113,7 +117,7 @@ def getReq():
   q = Req.query().fetch()
   sOut = ''
   for result in q:
-    sOut += "%s %s\n" % (result.reqProps, str(result.date))
+    sOut += "%s %s<br>" % (result.reqProps, str(result.date))
   return sOut
 
 def clearReq():

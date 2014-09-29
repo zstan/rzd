@@ -16,7 +16,7 @@ from datetime import datetime
 
 from startpage import getMainPage
 from mail import sendMail
-from common import getResponse, getResponseStub, getCurrentGoogleUserCode
+from common import getResponse, getResponseStub, getCurrentGoogleUserCode, redFont0, fontClose
 
 import storage
 
@@ -28,9 +28,7 @@ import logging, time
 suggestDict = {}
 suggestDictSize = 5000
 
-redFont0 = '<font size=\"2\" color=\"red\">'
 grayFont0 = '<font size=\"2\" color=\"#B3B3B3\">' 
-fontClose = '</font>'
 NoSeats = '<br>&nbsp;%s%s%s<br>' % (grayFont0, u'все билеты раскупили, негодяи:(', fontClose)
 domainPrefix = 'rzdzstan0'
 
@@ -292,8 +290,8 @@ class StatPage(webapp2.RequestHandler):
     if (clear):
       storage.clearReq()
     self.response.out.write(storage.getUsers())
-    self.response.out.write('\n\n')
-    self.response.out.write(storage.getReq()+'\n')
+    self.response.out.write('<br><br>')
+    self.response.out.write(storage.getReq())
 
 class ScriptTest(webapp2.RequestHandler):
   def get(self):
